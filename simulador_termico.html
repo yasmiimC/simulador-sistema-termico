@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Simulador — Sistema Térmico CPU | UENP 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg:#0b0e14; --surf:#13171f; --surf2:#1a1f2b;
+  --bord:rgba(255,255,255,.07); --bord2:rgba(255,255,255,.14);
+  --blue:#3b82f6; --green:#22d3a5; --amber:#f59e0b; --red:#f43f5e;
+  --text:#e8eaf0; --muted:#6b7280;
+  --mono:'IBM Plex Mono',monospace; --sans:'Inter',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(59,130,246,.025) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(59,130,246,.025) 1px,transparent 1px);
+  background-size:40px 40px;pointer-events:none;z-index:0}
+
+.app{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:0 16px 60px}
+
+/* ── HEADER ── */
+header{padding:28px 0 24px;border-bottom:1px solid var(--bord);margin-bottom:24px;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.htag{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--red);
+  text-transform:uppercase;margin-bottom:6px}
+h1{font-size:clamp(18px,4vw,30px);font-weight:800;color:#fff;letter-spacing:-.02em;line-height:1.15}
+h1 span{color:var(--amber)}
+.hmeta{font-size:11px;color:var(--muted);margin-top:6px;font-family:var(--mono)}
+.hbadge{background:var(--surf2);border:1px solid var(--bord2);border-radius:10px;
+  padding:8px 14px;text-align:right;flex-shrink:0}
+.hbadge .bi{font-size:10px;color:var(--muted)}
+.hbadge .bn{font-size:11px;font-weight:500;color:var(--text);margin-top:2px}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:2px;background:var(--surf);border:1px solid var(--bord);
+  border-radius:12px;padding:4px;margin-bottom:22px;overflow-x:auto;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:1;min-width:90px;padding:8px 10px;border:none;background:none;
+  border-radius:9px;cursor:pointer;font-family:var(--sans);font-size:11px;
+  font-weight:500;color:var(--muted);display:flex;align-items:center;
+  justify-content:center;gap:5px;transition:all .2s;white-space:nowrap}
+.tab svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0}
+.tab:hover{color:var(--text);background:var(--surf2)}
+.tab.active{background:var(--red);color:#fff}
+
+/* ── PANELS ── */
+.panel{display:none;animation:fi .22s ease}
+.panel.active{display:block}
+@keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+/* ── METRIC CARDS ── */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+  gap:10px;margin-bottom:20px}
+.card{background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:14px}
+.cl{font-family:var(--mono);font-size:9px;letter-spacing:.07em;color:var(--muted);
+  text-transform:uppercase;margin-bottom:6px}
+.cv{font-size:20px;font-weight:700;color:#fff;font-family:var(--mono)}
+.cu{font-size:10px;color:var(--muted);margin-left:2px}
+.card.red{border-color:rgba(244,63,94,.3)}.card.red .cv{color:var(--red)}
+.card.amber{border-color:rgba(245,158,11,.3)}.card.amber .cv{color:var(--amber)}
+.card.green{border-color:rgba(34,211,165,.3)}.card.green .cv{color:var(--green)}
+
+/* ── TWO-COL LAYOUT ── */
+.p2col{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
+@media(max-width:700px){.p2col{grid-template-columns:1fr}}
+
+/* ── CONTROLS ── */
+.csec{background:var(--surf);border:1px solid var(--bord);border-radius:12px;
+  padding:16px;margin-bottom:14px}
+.csec-title{font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--red);
+  text-transform:uppercase;margin-bottom:14px}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:500px){.cgrid{grid-template-columns:1fr}}
+.cblock label{font-size:11px;color:var(--muted);display:block;margin-bottom:7px}
+.cblock label b{color:var(--text);font-style:italic}
+.srow{display:flex;align-items:center;gap:8px}
+input[type=range]{flex:1;height:4px;appearance:none;background:var(--surf2);
+  border-radius:2px;outline:none;cursor:pointer;min-width:0}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:16px;height:16px;
+  background:var(--red);border-radius:50%;cursor:pointer;border:2px solid var(--bg);
+  transition:transform .15s}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2)}
+.sval{font-family:var(--mono);font-size:11px;color:var(--red);min-width:70px;text-align:right}
+
+/* ── STABILITY BOXES ── */
+.stabrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+@media(max-width:420px){.stabrow{grid-template-columns:1fr}}
+.sbox{border-radius:10px;padding:11px 13px;font-family:var(--mono);font-size:10px;line-height:1.7}
+.sbox-up{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);color:var(--amber)}
+.sbox-dn{background:rgba(34,211,165,.07);border:1px solid rgba(34,211,165,.2);color:var(--green)}
+
+/* ── EDO LIVE ── */
+.edolive{background:var(--bg);border:1px solid var(--bord2);border-left:3px solid var(--red);
+  border-radius:0 8px 8px 0;padding:12px 15px;font-family:var(--mono);font-size:12px;
+  color:var(--text);margin-top:14px;overflow-x:auto;white-space:nowrap}
+.edolive .hl{color:var(--amber)}.edolive .hl2{color:var(--green)}
+
+/* ── CPU PANEL ── */
+.cpu-panel{background:var(--surf);border:1px solid var(--bord);border-radius:12px;
+  padding:16px;position:sticky;top:16px}
+@media(max-width:700px){.cpu-panel{position:static}}
+.tptitle{font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--amber);
+  text-transform:uppercase;margin-bottom:12px}
+#cpu-canvas{display:block;width:100%;border-radius:8px}
+.ttime{display:flex;align-items:center;gap:8px;margin-top:12px}
+.ttime label{font-family:var(--mono);font-size:10px;color:var(--muted);flex-shrink:0}
+#tslider{flex:1}
+.ttval{font-family:var(--mono);font-size:11px;color:var(--red);min-width:42px;text-align:right}
+.playbtn{background:var(--red);border:none;border-radius:7px;color:#fff;
+  font-size:11px;font-family:var(--mono);padding:6px 11px;cursor:pointer;
+  white-space:nowrap;transition:opacity .15s;flex-shrink:0}
+.playbtn:hover{opacity:.85}
+.tstats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.tstat{background:var(--bg);border:1px solid var(--bord);border-radius:8px;padding:8px 10px}
+.tslbl{font-family:var(--mono);font-size:9px;letter-spacing:.06em;color:var(--muted);
+  text-transform:uppercase;margin-bottom:3px}
+.tsval{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text)}
+.tsval.r{color:var(--red)}.tsval.g{color:var(--green)}.tsval.a{color:var(--amber)}
+
+/* ── CHART BOX ── */
+.cbox{background:var(--surf);border:1px solid var(--bord);border-radius:12px;
+  padding:18px;margin-bottom:14px}
+.cboxt{font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--muted);
+  text-transform:uppercase;margin-bottom:14px}
+.leg{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px}
+.li{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted)}
+.ll{width:22px;height:2px;border-radius:1px}
+.lld{background:none!important;border-top:2px dashed}
+
+/* ── TABLE ── */
+.twrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+th{text-align:left;padding:9px 10px;color:var(--muted);font-size:9px;
+  letter-spacing:.07em;text-transform:uppercase;border-bottom:1px solid var(--bord);font-weight:500}
+td{padding:8px 10px;border-bottom:1px solid var(--bord);color:var(--text)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surf2)}
+.ee{color:#fca5a5}.er{color:var(--green)}
+
+/* ── CMP TABLE ── */
+.cmpt{width:100%;border-collapse:collapse;font-size:11px}
+.cmpt th{background:var(--surf2);padding:9px 12px;text-align:left;
+  font-size:9px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.cmpt td{padding:9px 12px;border-bottom:1px solid var(--bord)}
+.cmpt tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:500;font-family:var(--mono)}
+.bg{background:rgba(34,211,165,.13);color:var(--green)}
+.br{background:rgba(244,63,94,.13);color:#fca5a5}
+
+/* ── THEORY ── */
+.tgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+@media(max-width:540px){.tgrid{grid-template-columns:1fr}}
+.tcard{background:var(--surf);border:1px solid var(--bord);border-radius:12px;padding:16px}
+.tcard h3{font-size:12px;font-weight:600;color:var(--amber);margin-bottom:10px;letter-spacing:.01em}
+.tcard p{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.9}
+.tcard p b{color:var(--text)}
+.irow{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bord);font-size:11px}
+.irow:last-child{border-bottom:none}
+.ik{color:var(--muted)}.iv{color:var(--text);font-weight:500}
+
+/* scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--bord2);border-radius:3px}
+
+footer{text-align:center;font-family:var(--mono);font-size:9px;color:var(--muted);
+  padding-top:28px;border-top:1px solid var(--bord);margin-top:36px;letter-spacing:.05em}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- HEADER -->
+<header>
+  <div>
+    <div class="htag">// Cálculo II &amp; Aplicações Computacionais</div>
+    <h1>Simulador de <span>Sistema Térmico</span> — CPU</h1>
+    <div class="hmeta">Lei de Newton · EDO linear · Euler · RK4 · Campo de Direções</div>
+  </div>
+  <div class="hbadge">
+    <div class="bi">UENP — Bandeirantes, 2026</div>
+    <div class="bn">Ana Alice · Ana Clara · Yasmim</div>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="tab('params')">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+    Parâmetros
+  </button>
+  <button class="tab" onclick="tab('grafico')">
+    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Gráfico T(t)
+  </button>
+  <button class="tab" onclick="tab('campo')">
+    <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    Campo
+  </button>
+  <button class="tab" onclick="tab('erros')">
+    <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><polyline points="7 16 11 12 15 14 20 9"/></svg>
+    Erros
+  </button>
+  <button class="tab" onclick="tab('teoria')">
+    <svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    Teoria
+  </button>
+</div>
+
+<!-- ═══ PARÂMETROS ═══ -->
+<div class="panel active" id="panel-params">
+  <div class="cards">
+    <div class="card red">
+      <div class="cl">Equilíbrio T*</div>
+      <div class="cv" id="c-ts">91.67<span class="cu">°C</span></div>
+    </div>
+    <div class="card amber">
+      <div class="cl">Taxa k</div>
+      <div class="cv" id="c-k">0.150<span class="cu">s⁻¹</span></div>
+    </div>
+    <div class="card green">
+      <div class="cl">Tempo 63% (τ)</div>
+      <div class="cv" id="c-tau">6.67<span class="cu">s</span></div>
+    </div>
+    <div class="card">
+      <div class="cl">Geração H</div>
+      <div class="cv" id="c-H">8.50<span class="cu">°C/s</span></div>
+    </div>
+    <div class="card">
+      <div class="cl">Variação inicial</div>
+      <div class="cv" id="c-dT0">8.50<span class="cu">°C/s</span></div>
+    </div>
+  </div>
+
+  <div class="p2col">
+    <!-- esquerda: sliders -->
+    <div>
+      <div class="csec">
+        <div class="csec-title">// sistema físico</div>
+        <div class="cgrid">
+          <div class="cblock">
+            <label>Temp. ambiente <b>T<sub>amb</sub></b></label>
+            <div class="srow">
+              <input type="range" id="sl-Tamb" min="15" max="50" step="1" value="35" oninput="update()">
+              <span class="sval"><span id="v-Tamb">35</span> °C</span>
+            </div>
+          </div>
+          <div class="cblock">
+            <label>Geração de calor <b>H</b></label>
+            <div class="srow">
+              <input type="range" id="sl-H" min="1" max="20" step="0.5" value="8.5" oninput="update()">
+              <span class="sval"><span id="v-H">8.50</span> °C/s</span>
+            </div>
+          </div>
+          <div class="cblock">
+            <label>Coef. resfriamento <b>k</b></label>
+            <div class="srow">
+              <input type="range" id="sl-k" min="0.01" max="0.5" step="0.005" value="0.15" oninput="update()">
+              <span class="sval"><span id="v-k">0.150</span> s⁻¹</span>
+            </div>
+          </div>
+          <div class="cblock">
+            <label>Temp. inicial <b>T₀</b></label>
+            <div class="srow">
+              <input type="range" id="sl-T0" min="15" max="80" step="1" value="35" oninput="update()">
+              <span class="sval"><span id="v-T0">35</span> °C</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="csec">
+        <div class="csec-title">// parâmetros numéricos</div>
+        <div class="cgrid">
+          <div class="cblock">
+            <label>Passo <b>h</b></label>
+            <div class="srow">
+              <input type="range" id="sl-h" min="0.1" max="3.0" step="0.1" value="0.5" oninput="update()">
+              <span class="sval"><span id="v-h">0.50</span> s</span>
+            </div>
+          </div>
+          <div class="cblock">
+            <label>Tempo total <b>T</b></label>
+            <div class="srow">
+              <input type="range" id="sl-T" min="5" max="120" step="5" value="30" oninput="update()">
+              <span class="sval"><span id="v-T">30</span> s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stabrow">
+        <div class="sbox sbox-up">T &lt; T* → dT/dt &gt; 0<br><b>aquece</b> ao equilíbrio ▲</div>
+        <div class="sbox sbox-dn">T &gt; T* → dT/dt &lt; 0<br><b>resfria</b> ao equilíbrio ▼</div>
+      </div>
+
+      <div class="edolive" id="edo-live">
+        dT/dt = <span class="hl">8.50</span> − <span class="hl2">0.150</span>·(T(t) − 35),&nbsp; T(0) = 35
+      </div>
+    </div>
+
+    <!-- direita: CPU animada -->
+    <div class="cpu-panel">
+      <div class="tptitle">// chip em tempo real</div>
+      <canvas id="cpu-canvas" height="300"></canvas>
+
+      <div class="ttime">
+        <label>t =</label>
+        <input type="range" id="tslider" min="0" max="200" step="1" value="0" oninput="onSlider()">
+        <span class="ttval" id="tlbl">0.00 s</span>
+        <button class="playbtn" id="playbtn" onclick="togglePlay()">▶ Play</button>
+      </div>
+
+      <div class="tstats">
+        <div class="tstat"><div class="tslbl">T(t)</div><div class="tsval r" id="ts-Tt">35.00 °C</div></div>
+        <div class="tstat"><div class="tslbl">% Equilíbrio</div><div class="tsval g" id="ts-pct">0 %</div></div>
+        <div class="tstat"><div class="tslbl">Status</div><div class="tsval a" id="ts-status">NORMAL</div></div>
+        <div class="tstat"><div class="tslbl">dT/dt</div><div class="tsval" id="ts-dT">+8.50 °C/s</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ GRÁFICO ═══ -->
+<div class="panel" id="panel-grafico">
+  <div class="cbox">
+    <div class="cboxt">// evolução temporal de T(t)</div>
+    <div style="position:relative;width:100%;height:320px">
+      <canvas id="chart-main"></canvas>
+    </div>
+    <div class="leg">
+      <div class="li"><div class="ll" style="background:#f43f5e"></div>Analítica</div>
+      <div class="li"><div class="ll lld" style="border-color:#3b82f6"></div>Euler</div>
+      <div class="li"><div class="ll lld" style="border-color:#22d3a5"></div>RK4</div>
+      <div class="li"><div class="ll" style="background:#f59e0b;opacity:.7"></div>T*</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CAMPO ═══ -->
+<div class="panel" id="panel-campo">
+  <div class="cbox">
+    <div class="cboxt">// campo de direções — dT/dt = H − k·(T − T<sub>amb</sub>)</div>
+    <canvas id="canvas-campo" style="width:100%;border-radius:8px;display:block"></canvas>
+    <div class="leg" style="margin-top:10px">
+      <div class="li"><div class="ll" style="background:#f43f5e"></div>Trajetória (T₀ atual)</div>
+      <div class="li"><div class="ll" style="background:#22d3a5;opacity:.7"></div>T₀ &lt; T* (aquece)</div>
+      <div class="li"><div class="ll" style="background:#3b82f6;opacity:.7"></div>T₀ &gt; T* (resfria)</div>
+      <div class="li"><div class="ll" style="background:#f59e0b;opacity:.7"></div>Equilíbrio T*</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ERROS ═══ -->
+<div class="panel" id="panel-erros">
+  <div class="cbox">
+    <div class="cboxt">// erro absoluto acumulado</div>
+    <div style="position:relative;width:100%;height:240px">
+      <canvas id="chart-err"></canvas>
+    </div>
+    <div class="leg">
+      <div class="li"><div class="ll" style="background:#3b82f6"></div>Erro Euler — O(h)</div>
+      <div class="li"><div class="ll" style="background:#22d3a5"></div>Erro RK4 — O(h⁴)</div>
+    </div>
+  </div>
+  <div class="cbox">
+    <div class="cboxt">// tabela de erros por instante</div>
+    <div class="twrap">
+      <table>
+        <thead><tr><th>t(s)</th><th>Analítica</th><th>Euler</th><th>Erro Euler</th><th>RK4</th><th>Erro RK4</th></tr></thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="cbox">
+    <div class="cboxt">// comparação entre métodos</div>
+    <table class="cmpt">
+      <thead><tr><th>Característica</th><th>Euler</th><th>RK4</th></tr></thead>
+      <tbody>
+        <tr><td>Precisão global</td><td><span class="badge br">O(h)</span></td><td><span class="badge bg">O(h⁴)</span></td></tr>
+        <tr><td>Avaliações de f/passo</td><td>1</td><td>4</td></tr>
+        <tr><td>Custo computacional</td><td>Baixo</td><td>Moderado</td></tr>
+        <tr><td>Sistemas eletrônicos</td><td><span class="badge br">Não recomendado</span></td><td><span class="badge bg">Recomendado</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ TEORIA ═══ -->
+<div class="panel" id="panel-teoria">
+  <div class="edolive" style="margin-bottom:14px">
+    dT/dt = <span class="hl">H</span> − <span class="hl2">k</span>·(T(t) − T<sub>amb</sub>),&nbsp; T(0) = T₀
+  </div>
+  <div class="tgrid">
+    <div class="tcard">
+      <h3>Balanço térmico</h3>
+      <p><b>Geração:</b> H [°C/s]<br>
+         <b>Dissipação:</b> k·(T − T<sub>amb</sub>) [°C/s]<br>
+         <b>EDO:</b> dT/dt = H − k·(T − T<sub>amb</sub>)</p>
+    </div>
+    <div class="tcard">
+      <h3>Solução analítica</h3>
+      <p>T(t) = T* + (T₀ − T*)·e<sup>−kt</sup><br><br>
+         <b id="sol-txt">T(t) = 91.67 − 56.67·e⁻⁰·¹⁵ᵗ</b></p>
+    </div>
+    <div class="tcard">
+      <h3>Método de Euler</h3>
+      <p>T<sub>n+1</sub> = T<sub>n</sub> + h·f(T<sub>n</sub>)<br>
+         f(T) = H − k·(T − T<sub>amb</sub>)<br>
+         Erro local: <b>O(h²)</b><br>
+         Erro global: <b>O(h)</b></p>
+    </div>
+    <div class="tcard">
+      <h3>Método RK4</h3>
+      <p>k₁=f(Tₙ)<br>
+         k₂=f(Tₙ+h·k₁/2)<br>
+         k₃=f(Tₙ+h·k₂/2)<br>
+         k₄=f(Tₙ+h·k₃)<br>
+         T<sub>n+1</sub>=Tₙ+h/6·(k₁+2k₂+2k₃+k₄)<br>
+         Erro global: <b>O(h⁴)</b></p>
+    </div>
+  </div>
+  <div class="tcard" style="margin-bottom:12px">
+    <h3>Temperatura de equilíbrio T*</h3>
+    <p>dT/dt = 0 → T* = T<sub>amb</sub> + H/k<br>
+       Verificação: <span id="t-star-check">35 + 8.5/0.15 = 91.67 °C</span></p>
+  </div>
+  <div class="tcard" style="margin-bottom:12px">
+    <h3>Constante de tempo τ</h3>
+    <p>τ = 1/k = 1/<span id="tau-k">0.150</span> ≈ <span id="tau-v">6.67</span> s<br>
+       (tempo para atingir 63% do equilíbrio)</p>
+  </div>
+  <div class="tcard">
+    <h3>Contexto físico</h3>
+    <div class="irow"><span class="ik">Processador</span><span class="iv">Intel Core i7 13ª geração</span></div>
+    <div class="irow"><span class="ik">GPU</span><span class="iv">NVIDIA RTX 4050</span></div>
+    <div class="irow"><span class="ik">Mecanismo de proteção</span><span class="iv">Thermal Throttling (~92 °C)</span></div>
+  </div>
+</div>
+
+<footer>UENP · Cálculo II e Aplicações Computacionais · 2026 · Ana Alice Montoro · Ana Clara Correia · Yasmim Coimbra De Grandi</footer>
+</div><!-- /app -->
+
+<script>
+// ── STATE ──────────────────────────────────────────────
+let chartMain=null, chartErr=null;
+let playing=false, playTimer=null, playStep=0;
+let curK=0.15, curH=8.5, curTamb=35, curT0=35, curTstar=91.67, curTtotal=30;
+
+// ── HELPERS ──────────────────────────────────────────
+const $=id=>document.getElementById(id);
+const gv=id=>parseFloat($(id).value);
+const f=(n,d=3)=>n.toFixed(d);
+
+function analytic(t){ return curTstar+(curT0-curTstar)*Math.exp(-curK*t); }
+
+function euler(k,H,Tamb,T0,h,N){
+  let T=[T0];
+  for(let i=0;i<N;i++) T.push(T[i]+h*(H-k*(T[i]-Tamb)));
+  return T;
+}
+function rk4fn(k,H,Tamb,T0,h,N){
+  const ff=T=>H-k*(T-Tamb);
+  let T=[T0];
+  for(let i=0;i<N;i++){
+    let t=T[i],k1=ff(t),k2=ff(t+h/2*k1),k3=ff(t+h/2*k2),k4=ff(t+h*k3);
+    T.push(t+h/6*(k1+2*k2+2*k3+k4));
+  }
+  return T;
+}
+
+// ── MAIN UPDATE ──────────────────────────────────────
+function update(){
+  const Tamb=gv('sl-Tamb'), H=gv('sl-H'), k=gv('sl-k'), T0=gv('sl-T0');
+  const h=gv('sl-h'), Ttotal=gv('sl-T');
+  const Tstar=Tamb+H/k, tau=1/k, N=Math.round(Ttotal/h);
+
+  curK=k; curH=H; curTamb=Tamb; curT0=T0; curTstar=Tstar; curTtotal=Ttotal;
+
+  // labels
+  $('v-Tamb').textContent=Tamb; $('v-H').textContent=f(H,2);
+  $('v-k').textContent=f(k,3); $('v-T0').textContent=T0;
+  $('v-h').textContent=f(h,2); $('v-T').textContent=Ttotal;
+
+  // metric cards
+  $('c-ts').innerHTML=f(Tstar,2)+'<span class="cu">°C</span>';
+  $('c-k').innerHTML=f(k,3)+'<span class="cu">s⁻¹</span>';
+  $('c-tau').innerHTML=f(tau,2)+'<span class="cu">s</span>';
+  $('c-H').innerHTML=f(H,2)+'<span class="cu">°C/s</span>';
+  const dT0=H-k*(T0-Tamb);
+  $('c-dT0').innerHTML=f(dT0,2)+'<span class="cu">°C/s</span>';
+
+  // EDO live
+  $('edo-live').innerHTML=`dT/dt = <span class="hl">${f(H,2)}</span> − <span class="hl2">${f(k,3)}</span>·(T(t) − ${Tamb}),&nbsp; T(0) = ${T0}`;
+
+  // teoria
+  const diff=T0-Tstar;
+  let solStr=diff<0
+    ? `T(t) = ${f(Tstar,2)} − ${f(-diff,2)}·e<sup>−${f(k,3)}t</sup>`
+    : diff>0
+      ? `T(t) = ${f(Tstar,2)} + ${f(diff,2)}·e<sup>−${f(k,3)}t</sup>`
+      : `T(t) = ${f(Tstar,2)} (equilíbrio)`;
+  if($('sol-txt')) $('sol-txt').innerHTML=solStr;
+  if($('t-star-check')) $('t-star-check').textContent=`${Tamb} + ${f(H,2)}/${f(k,3)} = ${f(Tstar,2)} °C`;
+  if($('tau-k')) $('tau-k').textContent=f(k,3);
+  if($('tau-v')) $('tau-v').textContent=f(tau,2);
+
+  // build arrays
+  const ts=[],ta=[],te=[],tr=[];
+  const EA=euler(k,H,Tamb,T0,h,N), RA=rk4fn(k,H,Tamb,T0,h,N);
+  for(let i=0;i<=N;i++){
+    const t=i*h;
+    ts.push(f(t,1)); ta.push(Tstar+(T0-Tstar)*Math.exp(-k*t));
+    te.push(EA[i]); tr.push(RA[i]);
+  }
+  const errE=ta.map((v,i)=>Math.abs(v-te[i]));
+  const errR=ta.map((v,i)=>Math.abs(v-tr[i]));
+
+  // chart main
+  if(chartMain) chartMain.destroy();
+  chartMain=new Chart($('chart-main'),{type:'line',data:{labels:ts,datasets:[
+    {label:'Analítica',data:ta,borderColor:'#f43f5e',borderWidth:2.5,pointRadius:0,tension:.3},
+    {label:'Euler',data:te,borderColor:'#3b82f6',borderWidth:1.8,borderDash:[6,3],pointRadius:0,tension:.3},
+    {label:'RK4',data:tr,borderColor:'#22d3a5',borderWidth:1.8,borderDash:[2,3],pointRadius:0,tension:.3},
+    {label:'T*',data:Array(ts.length).fill(Tstar),borderColor:'#f59e0b',borderWidth:1,borderDash:[8,4],pointRadius:0}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:150},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'#13171f',borderColor:'rgba(255,255,255,.1)',borderWidth:1,
+      titleColor:'#e8eaf0',bodyColor:'#9ca3af',titleFont:{family:'IBM Plex Mono',size:10},bodyFont:{family:'IBM Plex Mono',size:9}}},
+    scales:{
+      x:{ticks:{autoSkip:true,maxTicksLimit:9,color:'#6b7280',font:{family:'IBM Plex Mono',size:9}},
+         grid:{color:'rgba(255,255,255,.04)'},border:{color:'rgba(255,255,255,.08)'}},
+      y:{ticks:{color:'#6b7280',font:{family:'IBM Plex Mono',size:9}},
+         grid:{color:'rgba(255,255,255,.04)'},border:{color:'rgba(255,255,255,.08)'},
+         title:{display:true,text:'T(t) [°C]',color:'#6b7280',font:{size:10}}}}}});
+
+  // chart err
+  if(chartErr) chartErr.destroy();
+  chartErr=new Chart($('chart-err'),{type:'line',data:{labels:ts,datasets:[
+    {label:'Erro Euler',data:errE,borderColor:'#3b82f6',borderWidth:2,pointRadius:0,fill:'origin',backgroundColor:'rgba(59,130,246,.07)'},
+    {label:'Erro RK4',data:errR,borderColor:'#22d3a5',borderWidth:2,pointRadius:0,fill:'origin',backgroundColor:'rgba(34,211,165,.07)'}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:150},
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'#13171f',borderColor:'rgba(255,255,255,.1)',borderWidth:1,
+      titleColor:'#e8eaf0',bodyColor:'#9ca3af',titleFont:{family:'IBM Plex Mono',size:10},bodyFont:{family:'IBM Plex Mono',size:9}}},
+    scales:{
+      x:{ticks:{autoSkip:true,maxTicksLimit:8,color:'#6b7280',font:{family:'IBM Plex Mono',size:9}},
+         grid:{color:'rgba(255,255,255,.04)'},border:{color:'rgba(255,255,255,.08)'}},
+      y:{ticks:{color:'#6b7280',font:{family:'IBM Plex Mono',size:9}},
+         grid:{color:'rgba(255,255,255,.04)'},border:{color:'rgba(255,255,255,.08)'},
+         title:{display:true,text:'Erro [°C]',color:'#6b7280',font:{size:10}}}}}});
+
+  // table
+  const step=Math.max(1,Math.floor(N/12));
+  let rows='';
+  for(let i=0;i<=N;i+=step){
+    const t=i*h,a=ta[i],e=te[i],r2=tr[i];
+    const eE=Math.abs(a-e),eR=Math.abs(a-r2);
+    rows+=`<tr><td>${f(t,1)}</td><td>${f(a,4)}</td><td>${f(e,4)}</td>
+      <td class="ee">${eE<1e-8?'<1e-8':eE<1e-4?eE.toExponential(2):f(eE,5)}</td>
+      <td>${f(r2,4)}</td>
+      <td class="er">${eR<1e-10?'≈0':eR<1e-6?eR.toExponential(2):f(eR,7)}</td></tr>`;
+  }
+  $('tbl-body').innerHTML=rows;
+
+  // campo
+  drawCampo();
+
+  // reset play
+  playStep=0;
+  $('tslider').max=N;
+  $('tslider').value=0;
+  drawCPU(T0,Tstar,Tamb,0);
+  updateCPUStats(T0,Tstar,H,k,Tamb,0);
+}
+
+// ── CAMPO DE DIREÇÕES ──────────────────────────────
+function drawCampo(){
+  const canvas=$('canvas-campo');
+  const W=canvas.offsetWidth||canvas.parentElement?.offsetWidth||
+    document.querySelector('.app')?.offsetWidth||600;
+  const H=Math.min(400,Math.round(W*0.58));
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const k=curK,Hg=curH,Tstar=curTstar,T0=curT0,Ttotal=curTtotal,Tamb=curTamb;
+  const pad={l:52,r:18,t:16,b:38};
+  const pw=W-pad.l-pad.r, ph=H-pad.t-pad.b;
+  const Tmin=Math.max(0,Tamb-10), Tmax=Tstar+20;
+  const tx=t=>pad.l+t/Ttotal*pw;
+  const ty=T=>pad.t+ph-((T-Tmin)/(Tmax-Tmin)*ph);
+
+  ctx.fillStyle='#0b0e14'; ctx.fillRect(0,0,W,H);
+
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,.04)'; ctx.lineWidth=.5;
+  for(let i=0;i<=5;i++){
+    ctx.beginPath();ctx.moveTo(tx(i/5*Ttotal),pad.t);ctx.lineTo(tx(i/5*Ttotal),pad.t+ph);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(pad.l,ty(Tmin+i/5*(Tmax-Tmin)));ctx.lineTo(pad.l+pw,ty(Tmin+i/5*(Tmax-Tmin)));ctx.stroke();
+  }
+
+  // setas
+  const n=25;
+  const arrowLen=Math.min(pw/n,ph/n)*1.05;
+  const headFrac=0.35, headHW=arrowLen*0.13;
+
+  for(let ci=0;ci<n;ci++){
+    for(let ri=0;ri<n;ri++){
+      const t=ci/(n-1)*Ttotal;
+      const T=Tmin+ri/(n-1)*(Tmax-Tmin);
+      const dT=Hg-k*(T-Tamb);
+
+      const dtC=1, dqC=-dT/Math.abs(Hg+k*(Tmax-Tmin)+0.001);
+      const mag=Math.sqrt(dtC**2+dqC**2)||1;
+      const ux=dtC/mag, uy=dqC/mag;
+
+      const cx=tx(t), cy=ty(T);
+      const L=arrowLen;
+      const x0=cx-ux*(L/2), y0=cy-uy*(L/2);
+      const x1=cx+ux*(L/2), y1=cy+uy*(L/2);
+      const hx=x1-ux*(L*headFrac), hy=y1-uy*(L*headFrac);
+      const px2=-uy, py2=ux;
+
+      const intensity=Math.min(1,Math.abs(dT)/(Math.abs(Hg)+0.01));
+      const alpha=0.25+intensity*0.6;
+      const col=`rgba(100,120,145,${alpha})`;
+
+      ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=0.85;
+      ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(hx,hy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x1,y1);
+      ctx.lineTo(hx+px2*headHW,hy+py2*headHW);
+      ctx.lineTo(hx-px2*headHW,hy-py2*headHW);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+
+  // equilíbrio T*
+  ctx.strokeStyle='rgba(245,158,11,.75)'; ctx.lineWidth=1.5; ctx.setLineDash([7,4]);
+  ctx.beginPath(); ctx.moveTo(pad.l,ty(Tstar)); ctx.lineTo(pad.l+pw,ty(Tstar)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // trajetórias extras
+  const extraT0s=[Tamb, Tamb+10, Tamb+20, Tstar*0.6, Tstar*0.75, Tstar*0.9, Tstar*1.05, Tstar*1.15, Tstar*1.3];
+  for(const eT0 of extraT0s){
+    if(Math.abs(eT0-T0)<(Tmax-Tmin)*0.05) continue;
+    const isAbove=eT0>Tstar;
+    ctx.strokeStyle=isAbove?'rgba(59,130,246,0.28)':'rgba(34,211,165,0.28)';
+    ctx.lineWidth=1.2; ctx.setLineDash([]);
+    ctx.beginPath(); let clipped=false;
+    for(let i=0;i<=300;i++){
+      const t=i/300*Ttotal, T=Tstar+(eT0-Tstar)*Math.exp(-k*t);
+      const px=tx(t), py2=ty(T);
+      if(py2<pad.t||py2>pad.t+ph){clipped=true;continue;}
+      if(clipped||i===0){ctx.moveTo(px,py2);clipped=false;}
+      else ctx.lineTo(px,py2);
+    }
+    ctx.stroke();
+  }
+
+  // trajetória principal
+  ctx.strokeStyle='#f43f5e'; ctx.lineWidth=2.4;
+  ctx.shadowColor='#f43f5e'; ctx.shadowBlur=10;
+  ctx.beginPath();
+  for(let i=0;i<=300;i++){
+    const t=i/300*Ttotal, T=Tstar+(T0-Tstar)*Math.exp(-k*t);
+    i===0?ctx.moveTo(tx(t),ty(T)):ctx.lineTo(tx(t),ty(T));
+  }
+  ctx.stroke(); ctx.shadowBlur=0;
+
+  // pontos nas trajetórias extras
+  for(const eT0 of extraT0s){
+    if(Math.abs(eT0-T0)<(Tmax-Tmin)*0.05||eT0<Tmin||eT0>Tmax) continue;
+    const py2=ty(eT0); if(py2<pad.t||py2>pad.t+ph) continue;
+    const isAbove=eT0>Tstar;
+    ctx.fillStyle=isAbove?'rgba(59,130,246,0.55)':'rgba(34,211,165,0.55)';
+    ctx.beginPath(); ctx.arc(tx(0),py2,3,0,Math.PI*2); ctx.fill();
+  }
+  ctx.fillStyle='#f43f5e';
+  ctx.beginPath(); ctx.arc(tx(0),ty(T0),4,0,Math.PI*2); ctx.fill();
+
+  // eixos
+  ctx.strokeStyle='rgba(255,255,255,.2)'; ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l,pad.t); ctx.lineTo(pad.l,pad.t+ph);
+  ctx.lineTo(pad.l+pw,pad.t+ph); ctx.stroke();
+
+  ctx.fillStyle='#6b7280'; ctx.font=`9px "IBM Plex Mono",monospace`; ctx.textAlign='center';
+  for(let i=0;i<=5;i++) ctx.fillText(f(i/5*Ttotal,0)+'s',tx(i/5*Ttotal),pad.t+ph+16);
+
+  ctx.textAlign='right';
+  for(let i=0;i<=4;i++){
+    const Tv=Tmin+i/4*(Tmax-Tmin);
+    ctx.fillText(f(Tv,0),pad.l-5,ty(Tv)+3);
+  }
+
+  ctx.fillStyle='rgba(245,158,11,.9)'; ctx.textAlign='left';
+  ctx.fillText('T*='+f(Tstar,1)+' °C',pad.l+4,ty(Tstar)-5);
+
+  ctx.fillStyle='#4b5563'; ctx.textAlign='center';
+  ctx.fillText('t (s)',pad.l+pw/2,H-4);
+  ctx.save();
+  ctx.translate(12,pad.t+ph/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText('T(t) [°C]',0,0); ctx.restore();
+}
+
+// ── CPU DRAWING ──────────────────────────────────────
+function tempColor(T,Tamb,Tstar){
+  const pct=Math.max(0,Math.min(1,(T-Tamb)/(Tstar-Tamb)));
+  // cool: #22d3a5 → warm: #f59e0b → hot: #f43f5e
+  if(pct<0.5){
+    const t=pct*2;
+    return [Math.round(34+(245-34)*t),Math.round(211+(158-211)*t),Math.round(165+(11-165)*t)];
+  } else {
+    const t=(pct-0.5)*2;
+    return [Math.round(245+(244-245)*t),Math.round(158+(63-158)*t),Math.round(11+(94-11)*t)];
+  }
+}
+
+function drawCPU(T,Tstar,Tamb,t){
+  const canvas=$('cpu-canvas');
+  const W=canvas.offsetWidth||280;
+  canvas.width=W; canvas.height=300;
+  const ctx=canvas.getContext('2d');
+  const H=300;
+  ctx.clearRect(0,0,W,H);
+
+  const pct=Math.max(0,Math.min(1,(T-Tamb)/(Tstar-Tamb)));
+  const [cr,cg,cb]=tempColor(T,Tamb,Tstar);
+  const chipColor=`rgba(${cr},${cg},${cb},1)`;
+  const chipGlow=`rgba(${cr},${cg},${cb},0.25)`;
+
+  // ── PCB Board
+  const bx=W*.08, by=H*.12, bw=W*.84, bh=H*.66;
+  ctx.fillStyle='#0f1a0f';
+  roundRect(ctx,bx,by,bw,bh,10); ctx.fill();
+  ctx.strokeStyle='rgba(34,211,165,.15)'; ctx.lineWidth=1;
+  roundRect(ctx,bx,by,bw,bh,10); ctx.stroke();
+
+  // PCB trace lines
+  ctx.strokeStyle='rgba(34,211,165,.08)'; ctx.lineWidth=1;
+  for(let i=0;i<6;i++){
+    ctx.beginPath();
+    ctx.moveTo(bx+10, by+20+i*18);
+    ctx.lineTo(bx+bw-10, by+20+i*18);
+    ctx.stroke();
+  }
+
+  // ── CPU Die (chip principal)
+  const chipSize=Math.min(bw,bh)*0.42;
+  const cx=bx+bw/2-chipSize/2, cy=by+bh/2-chipSize/2;
+
+  // glow externo
+  ctx.save();
+  ctx.shadowColor=chipColor; ctx.shadowBlur=pct>0.1?30*pct:0;
+  ctx.fillStyle=chipGlow;
+  roundRect(ctx,cx-6,cy-6,chipSize+12,chipSize+12,6); ctx.fill();
+  ctx.restore();
+
+  // corpo do chip
+  const bg=ctx.createLinearGradient(cx,cy,cx+chipSize,cy+chipSize);
+  bg.addColorStop(0,`rgba(${cr},${cg},${cb},0.9)`);
+  bg.addColorStop(1,`rgba(${Math.max(0,cr-60)},${Math.max(0,cg-60)},${Math.max(0,cb-40)},0.95)`);
+  ctx.fillStyle=bg;
+  roundRect(ctx,cx,cy,chipSize,chipSize,4); ctx.fill();
+
+  // grade interna do die
+  ctx.strokeStyle=`rgba(0,0,0,0.25)`; ctx.lineWidth=1;
+  const cells=4;
+  for(let i=1;i<cells;i++){
+    ctx.beginPath();
+    ctx.moveTo(cx+i*chipSize/cells,cy); ctx.lineTo(cx+i*chipSize/cells,cy+chipSize); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx,cy+i*chipSize/cells); ctx.lineTo(cx+chipSize,cy+i*chipSize/cells); ctx.stroke();
+  }
+
+  // highlight topo-esquerdo
+  ctx.fillStyle='rgba(255,255,255,0.1)';
+  roundRect(ctx,cx,cy,chipSize*0.5,chipSize*0.5,4); ctx.fill();
+
+  // borda do chip
+  ctx.strokeStyle=`rgba(${Math.min(255,cr+80)},${Math.min(255,cg+80)},${Math.min(255,cb+80)},0.6)`;
+  ctx.lineWidth=1.5;
+  roundRect(ctx,cx,cy,chipSize,chipSize,4); ctx.stroke();
+
+  // ── Pinos (pins) ao redor do chip
+  const pinColor='rgba(180,190,160,0.5)';
+  const pinSize=4, pinCount=8;
+  for(let i=0;i<pinCount;i++){
+    const frac=(i+0.5)/pinCount;
+    // topo e fundo
+    ctx.fillStyle=pinColor;
+    ctx.fillRect(cx+frac*chipSize-2, cy-8, pinSize, 7);
+    ctx.fillRect(cx+frac*chipSize-2, cy+chipSize+1, pinSize, 7);
+    // esquerda e direita
+    ctx.fillRect(cx-8, cy+frac*chipSize-2, 7, pinSize);
+    ctx.fillRect(cx+chipSize+1, cy+frac*chipSize-2, 7, pinSize);
+  }
+
+  // ── Temperatura no centro do chip
+  ctx.fillStyle='rgba(0,0,0,0.7)';
+  roundRect(ctx,cx+chipSize/2-32,cy+chipSize/2-14,64,28,4); ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.font=`bold ${Math.min(16,W*.05)}px "IBM Plex Mono",monospace`;
+  ctx.textAlign='center';
+  ctx.fillText(f(T,1)+' °C', cx+chipSize/2, cy+chipSize/2+5);
+
+  // ── Barra de temperatura (bottom)
+  const barX=bx+10, barY=by+bh-20, barW=bw-20, barH2=8;
+  ctx.fillStyle='rgba(0,0,0,0.4)';
+  roundRect(ctx,barX,barY,barW,barH2,4); ctx.fill();
+  if(pct>0){
+    const barG=ctx.createLinearGradient(barX,0,barX+barW,0);
+    barG.addColorStop(0,'#22d3a5');
+    barG.addColorStop(0.5,'#f59e0b');
+    barG.addColorStop(1,'#f43f5e');
+    ctx.save();
+    ctx.beginPath(); roundRect(ctx,barX,barY,barW,barH2,4); ctx.clip();
+    ctx.fillStyle=barG; ctx.fillRect(barX,barY,barW*pct,barH2);
+    ctx.restore();
+  }
+  ctx.strokeStyle='rgba(255,255,255,.1)'; ctx.lineWidth=1;
+  roundRect(ctx,barX,barY,barW,barH2,4); ctx.stroke();
+
+  // labels da barra
+  ctx.fillStyle='rgba(255,255,255,.4)'; ctx.font='8px "IBM Plex Mono",monospace';
+  ctx.textAlign='left'; ctx.fillText(f(Tamb,0)+'°',barX,barY+barH2+12);
+  ctx.textAlign='right'; ctx.fillText(f(Tstar,0)+'°',barX+barW,barY+barH2+12);
+  ctx.textAlign='center'; ctx.fillText('T*',barX+barW*pct,barY-3);
+
+  // ── T* linha tracejada no chip
+  const chipTstarY=cy+chipSize*(1-pct);
+  if(chipTstarY>cy && chipTstarY<cy+chipSize){
+    ctx.strokeStyle='rgba(245,158,11,.5)'; ctx.lineWidth=1; ctx.setLineDash([3,2]);
+    ctx.beginPath();
+    ctx.moveTo(cx+2,Math.max(cy+2,chipTstarY)); ctx.lineTo(cx+chipSize-2,Math.max(cy+2,chipTstarY));
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // ── Status (topo)
+  ctx.fillStyle='rgba(0,0,0,0.6)';
+  roundRect(ctx,bx+8,by+6,bw-16,20,4); ctx.fill();
+  const statusTxt=pct>0.9?'⚠ CRITICAL':pct>0.7?'HOT':pct>0.4?'WARM':'NORMAL';
+  const statusCol=pct>0.9?'#f43f5e':pct>0.7?'#f59e0b':pct>0.4?'#fcd34d':'#22d3a5';
+  ctx.fillStyle=statusCol;
+  ctx.font=`bold 9px "IBM Plex Mono",monospace`;
+  ctx.textAlign='left'; ctx.fillText(statusTxt, bx+14, by+19);
+  ctx.fillStyle='rgba(255,255,255,.4)';
+  ctx.textAlign='right'; ctx.fillText('t = '+f(t,1)+' s', bx+bw-10, by+19);
+
+  // ── Cooler (fan visual, top-right)
+  const fx=bx+bw-36, fy=by-30, fr=18;
+  ctx.save();
+  ctx.translate(fx,fy);
+  const rot=(t*3)%(Math.PI*2);
+  ctx.rotate(rot);
+  ctx.strokeStyle='rgba(100,120,160,0.5)'; ctx.lineWidth=1.5;
+  for(let i=0;i<4;i++){
+    ctx.beginPath();
+    ctx.ellipse(0,0,fr,fr*0.35,i*Math.PI/4,0,Math.PI); ctx.stroke();
+  }
+  ctx.restore();
+  ctx.fillStyle='rgba(100,120,160,0.3)';
+  ctx.beginPath(); ctx.arc(fx,fy,4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(100,120,160,.5)'; ctx.font='7px monospace'; ctx.textAlign='center';
+  ctx.fillText('cooler',fx,fy+fr+10);
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+}
+
+// ── CPU ANIMATION LOOP ───────────────────────────
+function tankLoop(){
+  if(!playing) return;
+  requestAnimationFrame(()=>{
+    const sl=$('tslider');
+    const max=parseInt(sl.max)||200;
+    if(playStep>=max){
+      playing=false; $('playbtn').textContent='▶ Play';
+      playStep=max; sl.value=max; renderCPUAt(max); return;
+    }
+    playStep++;
+    sl.value=playStep;
+    renderCPUAt(playStep);
+    setTimeout(tankLoop,35);
+  });
+}
+
+function renderCPUAt(step){
+  const sl=$('tslider');
+  const max=parseInt(sl.max)||1;
+  const t=step/max*curTtotal;
+  const Tt=analytic(t);
+  $('tlbl').textContent=f(t,2)+' s';
+  drawCPU(Tt,curTstar,curTamb,t);
+  updateCPUStats(Tt,curTstar,curH,curK,curTamb,t);
+}
+
+function updateCPUStats(T,Tstar,H,k,Tamb,t){
+  const pct=Math.min(100,Math.max(0,(T-Tamb)/(Tstar-Tamb)*100));
+  const dT=H-k*(T-Tamb);
+  const status=pct>90?'CRITICAL':pct>70?'HOT':pct>40?'WARM':'NORMAL';
+  $('ts-Tt').textContent=f(T,2)+' °C';
+  $('ts-pct').textContent=f(pct,1)+' %';
+  $('ts-status').textContent=status;
+  $('ts-dT').textContent=(dT>=0?'+':'')+f(dT,2)+' °C/s';
+}
+
+function onSlider(){
+  if(playing){playing=false; $('playbtn').textContent='▶ Play';}
+  renderCPUAt(parseInt($('tslider').value)||0);
+}
+
+function togglePlay(){
+  playing=!playing;
+  $('playbtn').textContent=playing?'⏸ Pause':'▶ Play';
+  if(playing){
+    if(parseInt($('tslider').value)>=$('tslider').max){
+      playStep=0; $('tslider').value=0;
+    } else {
+      playStep=parseInt($('tslider').value);
+    }
+    tankLoop();
+  }
+}
+
+// ── RESIZE OBSERVER ─────────────────────────────
+let resizeTimer=null;
+const ro=new ResizeObserver(()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(()=>{
+    const step=parseInt($('tslider').value)||0;
+    const max=parseInt($('tslider').max)||1;
+    const t=step/max*curTtotal;
+    drawCPU(analytic(t),curTstar,curTamb,t);
+  },80);
+});
+ro.observe($('cpu-canvas').parentElement||document.body);
+
+// ── TAB SWITCHING ─────────────────────────────────
+function tab(id){
+  const ids=['params','grafico','campo','erros','teoria'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',ids[i]===id));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  $('panel-'+id).classList.add('active');
+  if(id==='grafico'||id==='erros'){
+    setTimeout(()=>{ chartMain?.resize(); chartErr?.resize(); },60);
+  }
+  if(id==='campo') setTimeout(()=>{drawCampo();},60);
+}
+
+// ── CONTINUOUS ANIMATION ─────────────────────────
+(function animLoop(){
+  if($('cpu-canvas')&&!playing){
+    const sl=$('tslider');
+    const step=parseInt(sl.value)||0, max=parseInt(sl.max)||1;
+    const t=step/max*curTtotal;
+    drawCPU(analytic(t),curTstar,curTamb,t);
+  }
+  requestAnimationFrame(animLoop);
+})();
+
+// ── INIT ──────────────────────────────────────────
+window.addEventListener('load',()=>{ update(); });
+window.addEventListener('resize',()=>{
+  chartMain?.resize(); chartErr?.resize();
+  setTimeout(drawCampo,80);
+});
+</script>
+</body>
+</html>
